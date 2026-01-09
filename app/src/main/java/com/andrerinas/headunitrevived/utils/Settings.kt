@@ -7,12 +7,6 @@ import android.location.Location
 import com.andrerinas.headunitrevived.aap.protocol.proto.Control
 import com.andrerinas.headunitrevived.connection.UsbDeviceCompat
 
-/**
- * @author algavris
- * *
- * @date 21/05/2016.
- */
-
 class Settings(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -134,8 +128,22 @@ class Settings(context: Context) {
         set(value) { prefs.edit().putInt("margin-bottom", value).apply() }
 
     var startInFullscreenMode: Boolean
-        get() = prefs.getBoolean("start-in-fullscreen-mode", false)
+        get() = prefs.getBoolean("start-in-fullscreen-mode", true)
         set(value) { prefs.edit().putBoolean("start-in-fullscreen-mode", value).apply() }
+
+    var forceSoftwareDecoding: Boolean
+        get() = prefs.getBoolean("force-software-decoding", false)
+        set(value) { prefs.edit().putBoolean("force-software-decoding", value).apply() }
+
+    var videoCodec: String
+        get() = prefs.getString("video-codec", "Auto")!!
+        set(value) { prefs.edit().putString("video-codec", value).apply() }
+
+    var fpsLimit: Int
+        get() = prefs.getInt("fps-limit", 60)
+        set(value) { prefs.edit().putInt("fps-limit", value).apply() }
+
+
 
     @SuppressLint("ApplySharedPref")
     fun commit() {
@@ -144,9 +152,10 @@ class Settings(context: Context) {
 
     enum class Resolution(val id: Int, val resName: String, val width: Int, val height: Int, val codec: Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType?) {
         AUTO(0, "Auto",0, 0, null),
-        _800x480(1, "800x480", 800, 480, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._800x480),
-        _1280x720(2, "1280x720", 1280, 720, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._1280x720),
-        _1920x1080(3, "1920x1080", 1920, 1080, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._1920x1080);
+        _800x480(1, "480p", 800, 480, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._800x480),
+        _1280x720(2, "720p", 1280, 720, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._1280x720),
+        _1920x1080(3, "1080p", 1920, 1080, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._1920x1080),
+        _2560x1440(4, "1440p", 2560, 1440, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._2560x1440);
 
         // TODO: Portrait and higher Resolutions later
         /*        _2560x1440(4, "2560x1440 (Experimental)", 2560,1440, Control.Service.MediaSinkService.VideoConfiguration.VideoCodecResolutionType._2560x1440),

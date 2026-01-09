@@ -3,6 +3,7 @@ package com.andrerinas.headunitrevived.aap.protocol.messages
 import android.content.Context
 import com.andrerinas.headunitrevived.App
 import com.andrerinas.headunitrevived.aap.AapMessage
+import com.andrerinas.headunitrevived.aap.AapService
 import com.andrerinas.headunitrevived.aap.KeyCode
 import com.andrerinas.headunitrevived.aap.protocol.AudioConfigs
 import com.andrerinas.headunitrevived.aap.protocol.Channel
@@ -22,7 +23,7 @@ class ServiceDiscoveryResponse(private val context: Context)
             val settings = App.provide(context).settings
 
             // Initialize HeadUnitScreenConfig with actual physical screen dimensions
-            HeadUnitScreenConfig.init(context.resources.displayMetrics, settings)
+            HeadUnitScreenConfig.init(context, context.resources.displayMetrics, settings)
 
             val services = mutableListOf<Control.Service>()
 
@@ -44,12 +45,9 @@ class ServiceDiscoveryResponse(private val context: Context)
             val video = Control.Service.newBuilder().also { service ->
                 service.id = Channel.ID_VID
                 service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also { mediaSinkServiceBuilder ->
-                    mediaSinkServiceBuilder.availableType = Media.MediaCodecType.VIDEO
+                    mediaSinkServiceBuilder.availableType = Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP
                     mediaSinkServiceBuilder.audioType = Media.AudioStreamType.NONE
                     mediaSinkServiceBuilder.availableWhileInCall = true
-
-                    // Get the actual Screen Dimensions:
-                    //AppLog.i("[ServiceDiscovery] Actual screen dimensions: ${actualScreenWidth}x${actualScreenHeight}")
 
                     // Use HeadUnitScreenConfig for negotiated resolution and margins
                     val negotiatedResolution = HeadUnitScreenConfig.negotiatedResolutionType
@@ -61,10 +59,24 @@ class ServiceDiscoveryResponse(private val context: Context)
 
                     mediaSinkServiceBuilder.addVideoConfigs(Control.Service.MediaSinkService.VideoConfiguration.newBuilder().apply {
                         codecResolution = negotiatedResolution
-                        frameRate = Control.Service.MediaSinkService.VideoConfiguration.VideoFrameRateType._60
+                        frameRate = when (settings.fpsLimit) {
+                            30 -> Control.Service.MediaSinkService.VideoConfiguration.VideoFrameRateType._30
+                            else -> Control.Service.MediaSinkService.VideoConfiguration.VideoFrameRateType._60
+                        }
                         setDensity(HeadUnitScreenConfig.getDensityDpi()) // Use actual densityDpi
                         setMarginWidth(phoneWidthMargin)
                         setMarginHeight(phoneHeightMargin)
+
+                        val codecToRequest = when (settings.videoCodec) {
+                            "H.265" -> Media.MediaCodecType.MEDIA_CODEC_VIDEO_H265
+                            "Auto" -> if (com.andrerinas.headunitrevived.decoder.VideoDecoder.isHevcSupported()) {
+                                Media.MediaCodecType.MEDIA_CODEC_VIDEO_H265
+                            } else {
+                                Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP
+                            }
+                            else -> Media.MediaCodecType.MEDIA_CODEC_VIDEO_H264_BP
+                        }
+                        setVideoCodecType(codecToRequest)
                     }.build())
                 }.build()
             }.build()
@@ -75,8 +87,8 @@ class ServiceDiscoveryResponse(private val context: Context)
                 service.id = Channel.ID_INP
                 service.inputSourceService = Control.Service.InputSourceService.newBuilder().also {
                     it.touchscreen = Control.Service.InputSourceService.TouchConfig.newBuilder().apply {
-                        setWidth(HeadUnitScreenConfig.getDensityWidth()) // Use effective width
-                        setHeight(HeadUnitScreenConfig.getDensityHeight()) // Use effective height
+                        setWidth(HeadUnitScreenConfig.getAdjustedWidth()) // Use effective width
+                        setHeight(HeadUnitScreenConfig.getAdjustedHeight()) // Use effective height
                     }.build()
                     it.addAllKeycodesSupported(KeyCode.supported)
                 }.build()
@@ -84,40 +96,44 @@ class ServiceDiscoveryResponse(private val context: Context)
 
             services.add(input)
 
-            val audio1 = Control.Service.newBuilder().also { service ->
-                service.id = Channel.ID_AU1
-                service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also {
-                    it.availableType = Media.MediaCodecType.AUDIO
-                    it.audioType = Media.AudioStreamType.SPEECH
-                    it.addAudioConfigs(AudioConfigs.get(Channel.ID_AU1))
+            if (!AapService.selfMode) {
+                val audio1 = Control.Service.newBuilder().also { service ->
+                    service.id = Channel.ID_AU1
+                    service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also {
+                        it.availableType = Media.MediaCodecType.MEDIA_CODEC_AUDIO_PCM
+                        it.audioType = Media.AudioStreamType.SPEECH
+                        it.addAudioConfigs(AudioConfigs.get(Channel.ID_AU1))
+                    }.build()
                 }.build()
-            }.build()
-            services.add(audio1)
+                services.add(audio1)
+            }
 
             val audio2 = Control.Service.newBuilder().also { service ->
                 service.id = Channel.ID_AU2
                 service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also {
-                    it.availableType = Media.MediaCodecType.AUDIO
+                    it.availableType = Media.MediaCodecType.MEDIA_CODEC_AUDIO_PCM
                     it.audioType = Media.AudioStreamType.SYSTEM
                     it.addAudioConfigs(AudioConfigs.get(Channel.ID_AU2))
                 }.build()
             }.build()
             services.add(audio2)
 
-            val audio0 = Control.Service.newBuilder().also { service ->
-                service.id = Channel.ID_AUD
-                service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also {
-                    it.availableType = Media.MediaCodecType.AUDIO
-                    it.audioType = Media.AudioStreamType.MEDIA
-                    it.addAudioConfigs(AudioConfigs.get(Channel.ID_AUD))
+            if (!AapService.selfMode) {
+                val audio0 = Control.Service.newBuilder().also { service ->
+                    service.id = Channel.ID_AUD
+                    service.mediaSinkService = Control.Service.MediaSinkService.newBuilder().also {
+                        it.availableType = Media.MediaCodecType.MEDIA_CODEC_AUDIO_PCM
+                        it.audioType = Media.AudioStreamType.MEDIA
+                        it.addAudioConfigs(AudioConfigs.get(Channel.ID_AUD))
+                    }.build()
                 }.build()
-            }.build()
-            services.add(audio0)
+                services.add(audio0)
+            }
 
             val mic = Control.Service.newBuilder().also { service ->
                 service.id = Channel.ID_MIC
                 service.mediaSourceService = Control.Service.MediaSourceService.newBuilder().also {
-                    it.type = Media.MediaCodecType.AUDIO
+                    it.type = Media.MediaCodecType.MEDIA_CODEC_AUDIO_PCM
                     it.audioConfig = Media.AudioConfiguration.newBuilder().apply {
                         sampleRate = 16000
                         numberOfBits = 16
