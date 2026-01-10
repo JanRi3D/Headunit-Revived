@@ -19,6 +19,9 @@ class AapSslContext(keyManger: SingleKeyKeyManager): AapSsl {
     override fun prepare(): Int {
         sslEngine = sslContext.createSSLEngine().apply {
             useClientMode = true
+            // Explicitly enable TLSv1.2 - required for Android API 16-19 where TLSv1.2
+            // is available but not enabled by default
+            enabledProtocols = arrayOf("TLSv1.2")
             session.also {
                 val appBufferMax = it.applicationBufferSize
                 val netBufferMax = it.packetBufferSize
