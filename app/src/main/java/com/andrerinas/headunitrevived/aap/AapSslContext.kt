@@ -9,7 +9,8 @@ import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLEngineResult
 
 class AapSslContext(keyManger: SingleKeyKeyManager): AapSsl {
-    private val sslContext: SSLContext = SSLContext.getInstance("TLSv1.2").apply {
+    // Use "TLS" for broader compatibility with Android 4.2+ (API 17)
+    private val sslContext: SSLContext = SSLContext.getInstance("TLS").apply {
         init(arrayOf(keyManger), arrayOf(NoCheckTrustManager()), null)
         // Disable session caching to prevent stale states across connection attempts
         clientSessionContext.sessionCacheSize = 0
@@ -22,6 +23,8 @@ class AapSslContext(keyManger: SingleKeyKeyManager): AapSsl {
     override fun prepare(): Int {
         sslEngine = sslContext.createSSLEngine().apply {
             useClientMode = true
+            // Force enable TLS 1.0, TLS 1.1, and TLS 1.2 for Android 4.2 compatibility
+            enabledProtocols = arrayOf("TLSv1", "TLSv1.1", "TLSv1.2")
             session.also {
                 val appBufferMax = it.applicationBufferSize
                 val netBufferMax = it.packetBufferSize
